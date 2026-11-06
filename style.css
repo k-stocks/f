@@ -10,3 +10,41 @@
 /* 그래프는 기본 PC 2열, 모바일 1열을 공통 적용합니다.
    개별 그룹의 2열 강제 규칙을 두지 않아 기준금리 그래프와 같은 반응형 레이아웃을 사용합니다. */
 @media(max-width:760px){.chart-grid{grid-template-columns:minmax(0,1fr);gap:10px}}
+
+/* 새로고침 버튼: '시장 수급 분석' 화면의 버튼과 동일한 모양 */
+.tools button#refresh{box-shadow:none;font:inherit;cursor:pointer;width:34px;height:34px;padding:0;border:1px solid #e5eaf1;background:#f8f9fb;border-radius:10px;color:#657287;font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.tools button#refresh:active{background:#eaf0f7}
+.tools button#refresh:disabled{opacity:.55}
+
+
+/* 제목 영역: 종목 인사이트 화면과 동일한 흰색 바 + 녹색 막대 스타일 */
+.app{padding:0 0 40px}
+main{padding:22px 24px 0}
+header{height:61px;margin-bottom:0;padding:0 15px;background:#ffffffed;border-bottom:1px solid #e6eaf1;position:sticky;top:0;z-index:5}
+.brand{gap:8px}
+.brand i{width:4px;height:19px;border-radius:4px;background:#4ac18a}
+.brand b{display:block;font-size:16px;letter-spacing:normal}
+.brand small{font-size:8px;color:#9aa3af;letter-spacing:.7px;margin-top:2px}
+.tools{gap:6px}
+.tools button#theme,.tools button#refresh{box-shadow:none;font:inherit;cursor:pointer;width:34px;height:34px;padding:0;border:1px solid #e5eaf1;background:#f8f9fb;border-radius:10px;color:#657287;font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.tools button#theme:active{background:#eaf0f7}
+@media(max-width:760px){main{padding:11px 11px 0}.app{padding:0 0 28px}header{margin-bottom:0}.tools{gap:6px}}
+
+/* 다크 모드 */
+html.dark{color-scheme:dark;background:#151a22;color:#edf1f6}
+html.dark header{background:#1c232eed;border-bottom-color:#303a49}
+html.dark .brand small{color:#8693a6}
+html.dark .tools{color:#9aa6b8}
+html.dark .tools button#theme,html.dark .tools button#refresh{background:#202733;border-color:#303a49;color:#c3cddb}
+html.dark .tools button#theme:active,html.dark .tools button#refresh:active{background:#2a3343}
+html.dark .card,html.dark .chart-card{background:#202733;border-color:#303a49;box-shadow:none}
+html.dark .eyebrow,html.dark .section-heading>small,html.dark footer,html.dark .intro p,html.dark .intro-meta{color:#9aa6b8}
+html.dark .intro h1,html.dark .section-heading h2,html.dark .chart-head b,html.dark .chart-latest,html.dark .metric-value{color:#edf1f6}
+html.dark .metric{background:#1a212c;border-color:#2a3343}
+html.dark .metric-name{color:#c3cddb}
+html.dark .metric-source,html.dark .chart-date,html.dark .chart-foot,html.dark .chart-error small{color:#7f8ca0}
+html.dark .metric-change,html.dark .neutral,html.dark .chart-head a,html.dark .chart-error{color:#9aa6b8}
+html.dark .chart-head{border-bottom-color:#2a3343}
+html.dark .chart-area{background:#202733}
+html.dark .up{color:#ff6b6b!important}
+html.dark .down{color:#5b9bff!important}

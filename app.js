@@ -1,7 +1,11 @@
+// 명암(다크/라이트) 테마
+function isDark(){return document.documentElement.classList.contains('dark')}
+function chartTheme(){return isDark()?{bg:'#202733',text:'#9aa6b8',grid:'#2a3343',border:'#303a49'}:{bg:'#ffffff',text:'#8995a6',grid:'#f0f3f7',border:'#e6eaf1'}}
+function lineColor(delta){return delta>=0?(isDark()?'#ff6b6b':'#d84a4a'):(isDark()?'#5b9bff':'#3478d4')}
 'use strict';
 
 // FRED 시계열과 Yahoo Finance 일봉 데이터를 직접 받아 요약·차트를 그립니다.
-const PROXY_BASE = 'https://fomc.hundprint.workers.dev';
+const PROXY_BASE = 'https://fomc.mcraft-tiger-574.workers.dev';
 const $ = id => document.getElementById(id);
 const blank = '—';
 
@@ -294,15 +298,15 @@ function renderItem(item,values) {
   if(!window.LightweightCharts){area.textContent='차트 라이브러리를 불러오지 못했습니다.';return;}
   const chart=LightweightCharts.createChart(area,{
     width:area.clientWidth||320,height:220,
-    layout:{background:{type:'solid',color:'#ffffff'},textColor:'#8995a6',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',fontSize:10},
-    grid:{vertLines:{color:'#f0f3f7'},horzLines:{color:'#f0f3f7'}},
-    rightPriceScale:{borderColor:'#e6eaf1',scaleMargins:{top:.12,bottom:.12}},
-    timeScale:{borderColor:'#e6eaf1',timeVisible:false,rightOffset:2,barSpacing:7,minBarSpacing:.5},
+    layout:{background:{type:'solid',color:chartTheme().bg},textColor:chartTheme().text,fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',fontSize:10},
+    grid:{vertLines:{color:chartTheme().grid},horzLines:{color:chartTheme().grid}},
+    rightPriceScale:{borderColor:chartTheme().border,scaleMargins:{top:.12,bottom:.12}},
+    timeScale:{borderColor:chartTheme().border,timeVisible:false,rightOffset:2,barSpacing:7,minBarSpacing:.5},
     localization:{locale:'ko-KR',priceFormatter:v=>fmt(v,item.decimals)}
   });
-  const series=chart.addLineSeries({color:delta>=0?'#d84a4a':'#3478d4',lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true});
-  series.setData(values.map(v=>({time:v.time,value:v.value}))); 
-  chart.timeScale().fitContent(); charts.set(item.id,{chart,area});
+  const series=chart.addLineSeries({color:lineColor(delta),lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true});
+  series.__delta=delta; series.setData(values.map(v=>({time:v.time,value:v.value}))); 
+  chart.timeScale().fitContent(); charts.set(item.id,{chart,area,series});
   footEl.textContent=`${item.ticker} · ${item.basisDescription || '원자료'} · ${values.length.toLocaleString('ko-KR')}개 관측값 · ${itemDateLabel(item,values[0].date)} ~ ${itemDateLabel(item,last.date)}`;
 }
 
@@ -340,3 +344,14 @@ function resizeCharts(){for(const {chart,area} of charts.values()){if(area.clien
 makeSummary(); makeCharts(); $('refresh').addEventListener('click',refreshAll);
 window.addEventListener('resize',()=>{clearTimeout(window.__fomcResize);window.__fomcResize=setTimeout(resizeCharts,120);});
 refreshAll();
+
+$('theme').addEventListener('click',()=>{
+  const d=document.documentElement.classList.toggle('dark');
+  const m=document.querySelector('meta[name="theme-color"]'); if(m)m.content=d?'#151a22':'#f3f5f9';
+  try{localStorage.setItem('theme_v1',d?'dark':'light')}catch(e){}
+  const t=chartTheme();
+  for(const {chart,series} of charts.values()){
+    chart.applyOptions({layout:{background:{type:'solid',color:t.bg},textColor:t.text},grid:{vertLines:{color:t.grid},horzLines:{color:t.grid}},rightPriceScale:{borderColor:t.border},timeScale:{borderColor:t.border}});
+    if(series&&series.__delta!==undefined)series.applyOptions({color:lineColor(series.__delta)});
+  }
+});
