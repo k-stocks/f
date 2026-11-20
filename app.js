@@ -5,7 +5,7 @@ function lineColor(delta){return delta>=0?(isDark()?'#ff6b6b':'#d84a4a'):(isDark
 'use strict';
 
 // FRED 시계열과 Yahoo Finance 일봉 데이터를 직접 받아 요약·차트를 그립니다.
-const PROXY_BASE = 'https://fomc.mcraft-tiger-574.workers.dev';
+const PROXY_BASE = 'https://fomc.hundprint.workers.dev';
 const $ = id => document.getElementById(id);
 const blank = '—';
 
