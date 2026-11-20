@@ -5,7 +5,7 @@ function lineColor(delta){return delta>=0?(isDark()?'#ff6b6b':'#d84a4a'):(isDark
 'use strict';
 
 // FRED 시계열과 Yahoo Finance 일봉 데이터를 직접 받아 요약·차트를 그립니다.
-const PROXY_BASE = 'https://fomc.hundprint.workers.dev';
+const PROXY_BASE = 'https://fomc.mcraft-tiger-574.workers.dev';
 const $ = id => document.getElementById(id);
 const blank = '—';
 
@@ -196,29 +196,56 @@ function makeCharts() {
   });
 }
 
+let fredBatchPromises = new Map();
+const fredSeries = [...new Set(all.filter(item=>item.source==='fred').map(item=>item.ticker))];
+// Keep in sync with the Worker. DFEDTARU/L are daily 7-day series, not the
+// same native frequency as ordinary business-day daily series in FRED.
+const fredFrequency = {
+  DFEDTARU:'daily7', DFEDTARL:'daily7',
+  T5YIE:'daily', T10YIE:'daily', T5YIFR:'daily', DCOILWTICO:'daily', DCOILBRENTEU:'daily',
+  ICSA:'weekly', CCSA:'weekly',
+  EXPINF1YR:'monthly', CPIAUCNS:'monthly', CPILFENS:'monthly', PPIFIS:'monthly', PPIFES:'monthly',
+  UNRATE:'monthly', PAYEMS:'monthly', CES0500000003:'monthly', JTSJOL:'monthly', CIVPART:'monthly',
+  INDPRO:'monthly', TCU:'monthly', RSAFS:'monthly', MARTSMPCSM44X72USS:'monthly', PI:'monthly', UMCSENT:'monthly',
+  DPCERV1Q225SBEA:'quarterly', DPCCRV1Q225SBEA:'quarterly', GDP:'quarterly', A191RL1Q225SBEA:'quarterly'
+};
+
+async function loadFredBatch(frequency){
+  if(fredBatchPromises.has(frequency)) return fredBatchPromises.get(frequency);
+  const groupSeries=fredSeries.filter(id=>fredFrequency[id]===frequency);
+  if(!groupSeries.length) throw new Error(`FRED 주기 설정 누락: ${frequency}`);
+  const promise=(async()=>{
+    const endpoint=`${PROXY_BASE}/fred.csv?series=${encodeURIComponent(groupSeries.join(','))}&start=2015-01-01`;
+    const response=await fetch(endpoint,{cache:'no-store',headers:{'Accept':'text/csv,text/plain,*/*'}});
+    const csv=(await response.text()).replace(/^\uFEFF/,'').trim();
+    if(!response.ok) throw new Error(`FRED 데이터 연결 HTTP ${response.status}: ${csv.slice(0,260).replace(/\s+/g,' ')}`);
+    const lines=csv.split(/\r?\n/);
+    const headers=(lines.shift()||'').split(',').map(x=>x.trim());
+    if(headers[0]!=='observation_date'||!groupSeries.every(id=>headers.includes(id))) throw new Error(`FRED CSV 형식 또는 시리즈 누락(${frequency}): ${headers.join(',').slice(0,220)}`);
+    const indexes=Object.fromEntries(groupSeries.map(id=>[id,headers.indexOf(id)]));
+    const result=new Map(groupSeries.map(id=>[id,[]]));
+    for(const line of lines){
+      const parts=line.split(','); const date=(parts[0]||'').trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const time=Math.floor(Date.parse(`${date}T00:00:00Z`)/1000);
+      for(const id of groupSeries){
+        const raw=(parts[indexes[id]]||'').trim(); const value=raw==='.'||raw===''?NaN:Number(raw);
+        if(Number.isFinite(value)) result.get(id).push({time,value,date});
+      }
+    }
+    return result;
+  })().catch(error=>{fredBatchPromises.delete(frequency);throw error;});
+  fredBatchPromises.set(frequency,promise);
+  return promise;
+}
+
 async function fetchFred(item) {
-  // FRED 전용 Worker 경로를 사용합니다. 전체 URL 허용목록 검사로 인한 403을 피합니다.
-  const endpoint=`${PROXY_BASE}/fred.csv?series=${encodeURIComponent(item.ticker)}&start=2015-01-01`;
-  const response=await fetch(endpoint,{cache:'no-store',headers:{'Accept':'text/csv,text/plain,*/*'}});
-  if(!response.ok){
-    let detail='';
-    try{detail=(await response.text()).slice(0,220);}catch{}
-    throw new Error(`FRED 데이터 연결 HTTP ${response.status}${detail?`: ${detail}`:''}`);
-  }
-  const csv=(await response.text()).replace(/^\uFEFF/,'').trim();
-  if(!/^observation_date,/i.test(csv)) {
-    let detail=csv.slice(0,260).replace(/\s+/g,' ');
-    try { const payload=JSON.parse(csv); detail=payload.error || payload.message || payload.detail || JSON.stringify(payload).slice(0,220); } catch {}
-    throw new Error(`FRED CSV 형식이 아닙니다: ${detail || '빈 응답'} · Worker의 /fred.csv 경로 및 배포 버전을 확인하세요`);
-  }
-  const values=csv.split(/\r?\n/).slice(1).map(line=>{
-    const parts=line.split(','); const date=(parts[0]||'').trim(); const raw=(parts[1]||'').trim();
-    const value=raw==='.'||raw===''?NaN:Number(raw);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(value)) return null;
-    const normalized=value; // ICSA·CCSA는 이미 건 단위 원자료이므로 추가로 1,000으로 나누지 않습니다.
-    return {time:Math.floor(Date.parse(`${date}T00:00:00Z`)/1000),value:item.transform?item.transform(normalized):normalized,date};
-  }).filter(Boolean);
-  if(values.length<2) throw new Error('FRED 관측값 부족');
+  const frequency=fredFrequency[item.ticker];
+  if(!frequency) throw new Error(`${item.name}: FRED 주기 설정 누락`);
+  const batch=await loadFredBatch(frequency);
+  const raw=batch.get(item.ticker)||[];
+  if(raw.length<2) throw new Error(`${item.name}: FRED 관측값 부족 (${item.ticker}, ${raw.length}개)`);
+  const values=raw.map(point=>({...point,value:item.transform?item.transform(point.value):point.value}));
   const derived=item.rateSeries?deriveRateSeries(item,values):values;
   if(derived.length<2) throw new Error(`${item.name} 변환 후 관측값 부족`);
   return derived;
@@ -311,6 +338,7 @@ function renderItem(item,values) {
 }
 
 async function refreshAll() {
+  fredBatchPromises.clear();
   const button=$('refresh'); button.disabled=true;
   $('status').textContent='지표 데이터 불러오는 중…'; $('updated').textContent='업데이트 중';
   let success=0,fail=0,cursor=0;
